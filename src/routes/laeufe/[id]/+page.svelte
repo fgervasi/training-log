@@ -3,7 +3,17 @@
   import RunMap from '$lib/components/RunMap.svelte';
   import { goto } from '$app/navigation';
   import { fmtDate, fmtTime, fmtDur, fmtKm, fmtPace, fmtNum, fmtDelta } from '$lib/format.js';
-  let { data } = $props();
+  import { enhance } from '$app/forms';
+  let { data, form } = $props();
+
+  // Abschnitt festlegen: zwei Klicks ins Höhenprofil setzen Anfang und Ende
+  let segFrom = $state(null), segTo = $state(null), segName = $state('');
+  function pick() {
+    if (!hover?.km) return;
+    const km = Math.round(hover.km * 100) / 100;
+    if (segFrom == null || segTo != null) { segFrom = km; segTo = null; } else { segTo = km; }
+  }
+  const segRange = $derived(segFrom != null && segTo != null ? [Math.min(segFrom, segTo), Math.max(segFrom, segTo)] : null);
 
   const label = (a) => fmtDate(a.start_time);
   // geglättete Pace (min/km) über ±60 m
@@ -78,10 +88,22 @@
       <RunMap {tracks} {marker} height={460} />
     </div>
     <div class="panel">
-      <h3>Höhenprofil</h3>
+      <h3>Höhenprofil <span class="muted small">· Klick setzt Anfang/Ende eines Abschnitts</span></h3>
+      <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+      <div class="pick" onclick={pick}>
       <Plot height={150} onhover={(v) => (hover = v)} make={(w, P) => ({ ...common(P), y: { label: 'm ü. M.', grid: true, zero: false },
-        marks: [P.areaY(A, { x: 'km', y: 'alt_m', fill: 'var(--soft)', y1: (A.length ? Math.min(...A.map((p) => p.alt_m)) - 5 : 0) }), P.lineY(both, { x: 'km', y: 'alt_m', stroke: 'lauf' }),
+        marks: [...(segRange ? [P.rectX([segRange], { x1: (d) => d[0], x2: (d) => d[1], fill: 'var(--accent-2)', fillOpacity: 0.18 })] : []), ...(segFrom != null && segTo == null ? [P.ruleX([segFrom], { stroke: 'var(--accent-2)', strokeWidth: 2 })] : []),P.areaY(A, { x: 'km', y: 'alt_m', fill: 'var(--soft)', y1: (A.length ? Math.min(...A.map((p) => p.alt_m)) - 5 : 0) }), P.lineY(both, { x: 'km', y: 'alt_m', stroke: 'lauf' }),
           P.ruleX(A, P.pointerX({ x: 'km', stroke: 'var(--muted)' })), P.dot(A, P.pointerX({ x: 'km', y: 'alt_m', fill: 'var(--fg)', r: 3 }))] })} />
+      </div>
+      {#if segFrom != null}
+        <form method="POST" action="?/segment" class="row segform" use:enhance={() => async ({ update, result }) => { await update({ reset: false }); if (result.type === 'success') { segFrom = segTo = null; segName = ''; } }}>
+          <span class="small">Abschnitt km <input type="text" id="seg-from" name="from" bind:value={segFrom} size="4" /> bis <input type="text" id="seg-to" name="to" bind:value={segTo} size="4" placeholder="Klick" /></span>
+          <input type="text" id="seg-name" name="name" bind:value={segName} placeholder="Name, z. B. Anstieg" />
+          <button class="btn" disabled={!segRange || !segName.trim()}>Abschnitt speichern</button>
+          <button type="button" class="btn ghost" onclick={() => (segFrom = segTo = null)}>Abbrechen</button>
+        </form>
+      {/if}
+      {#if form?.error}<p class="small delta-bad">{form.error}</p>{:else if form?.created}<p class="small delta-good">Abschnitt „{form.created}“ gespeichert. Er gilt für alle Läufe dieser Route.</p>{/if}
       <h3>Pace</h3>
       <Plot height={150} onhover={(v) => (hover = v)} make={(w, P) => ({ ...common(P), y: { label: 'min/km', grid: true, reverse: true, tickFormat: fmtMin, ticks: 5 },
         marks: [P.lineY(both.filter((p) => p.pace), { x: 'km', y: 'pace', stroke: 'lauf', z: 'lauf' }),
@@ -92,6 +114,30 @@
           P.ruleX(A, P.pointerX({ x: 'km', stroke: 'var(--muted)' })), P.dot(A.filter((p) => p.hr), P.pointerX({ x: 'km', y: 'hr', fill: 'var(--fg)', r: 3 }))] })} />
     </div>
   </section>
+
+  {#if data.segments.length}
+    <section class="panel">
+      <h2>Abschnitte</h2>
+      <div class="tablewrap"><table>
+        <thead><tr><th>Abschnitt</th><th class="num">km</th><th class="num">{label(data.run)}</th>{#if data.vs}<th class="num">{label(data.vs)}</th><th class="num">Differenz</th>{/if}<th class="num">Ø Puls</th><th class="num">Aufstieg</th></tr></thead>
+        <tbody>
+          {#each data.segments as seg, i}
+            {@const r = seg.result}
+            {@const o = data.vsSegments[i]?.result}
+            <tr>
+              <td>{seg.name}</td>
+              <td class="num">{fmtNum(seg.start_km, 2)}–{fmtNum(seg.end_km, 2)}</td>
+              <td class="num">{r ? fmtDur(r.s) : '–'}</td>
+              {#if data.vs}<td class="num">{o ? fmtDur(o.s) : '–'}</td><td class="num {r && o ? cls(r.s - o.s) : ''}">{r && o ? fmtDelta(r.s - o.s, 0, ' s') : ''}</td>{/if}
+              <td class="num">{fmtNum(r?.avg_hr)}</td>
+              <td class="num">{r ? `${fmtNum(r.ascent)} m` : ''}</td>
+            </tr>
+          {/each}
+        </tbody>
+      </table></div>
+      <p class="muted small">Verlauf über alle Läufe: <a href="/laeufe?route={data.run.route_id}">Routenseite</a></p>
+    </section>
+  {/if}
 
   <section class="panel">
     <h2>Kilometerzeiten</h2>
@@ -113,3 +159,8 @@
     </div>
   </section>
 </main>
+
+<style>
+  .pick { cursor: crosshair; }
+  .segform input[type=text] { padding: 4px 6px; }
+</style>

@@ -18,6 +18,10 @@ Node 20.6 oder neuer. Mit pnpm geht es genauso (`pnpm install`): Die nötige Fre
 # Garmin: ZIP, Ordner oder einzelne .fit-Dateien. Bereits importierte Dateien werden übersprungen.
 npm run import -- ~/Downloads/<garmin-export>/DI_CONNECT/DI-Connect-Uploaded-Files
 
+# Garmin laufend: neue Aktivitäten seit der letzten importierten über die Personal API (GARMIN_API_KEY in .env).
+# --dry-run zeigt nur an, was geladen würde; --since YYYY-MM-DD wählt den Startpunkt.
+npm run sync:garmin
+
 # Notion: Trainingsplan, Übungsvariation und Übungen. Gibt die gefundenen Felder aus.
 npm run sync:notion
 ```
@@ -28,15 +32,21 @@ Die drei Notion-Datenbanken müssen mit der Integration verbunden sein (in Notio
 
 ```bash
 npm run dev                 # http://localhost:5180
+
+# oder als gebaute App
+npm run build && npm start  # http://localhost:3000
 ```
+
+Die Übersicht holt neue Aktivitäten aus Garmin und Notion automatisch, wenn der letzte Sync älter als 6 Stunden ist, oder per Knopf „Neue Aktivitäten holen“.
 
 | Seite | Inhalt |
 |---|---|
-| Übersicht | Kilometer und Tabata-Einheiten pro Woche, letzte Aktivitäten |
-| Läufe | Routen werden automatisch erkannt (umbenennbar). Zeit im Verlauf, Fitness als Meter pro Herzschlag, Pace gegen Puls |
-| Lauf-Detail | Karte (swisstopo), Höhenprofil, Pace und Puls entlang der Strecke, Vergleich mit einem anderen Lauf, Kilometerzeiten |
+| Übersicht | Sync mit Garmin und Notion, Kilometer und Tabata-Einheiten pro Woche, letzte Aktivitäten |
+| Läufe | Routen werden automatisch erkannt (umbenennbar). Zeit im Verlauf, Fitness als Meter pro Herzschlag, Pace gegen Puls, Abschnittszeiten über alle Läufe |
+| Lauf-Detail | Karte (swisstopo), Höhenprofil, Pace und Puls entlang der Strecke, Vergleich mit einem anderen Lauf, Kilometerzeiten. Zwei Klicks ins Höhenprofil legen einen Abschnitt an |
 | Tabata | Wiederholungen pro Intervall je Übung über die Zeit, Programme, alle Einheiten |
-| Tabata-Detail | Raster Runde × Übung, Vergleich mit der vorigen Einheit desselben Programms, Puls pro Intervall, Eintrag aus dem Notion-Trainingsplan |
+| Tabata-Detail | Blöcke mit Raster Runde × Übung, Zählfehler durchgestrichen, Vergleich mit der vorigen Einheit desselben Programms, Puls pro Intervall, Eintrag aus dem Notion-Trainingsplan |
+| Pläne | Plan gegen Ist: wie oft jede Übung eines Notion-Plans gemacht wurde, Trend, Übungen ausserhalb des Plans |
 | Übungen | Garmin-Übung einmal einer Notion-Übung zuordnen oder umbenennen |
 
 ## Aufbau

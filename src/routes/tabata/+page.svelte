@@ -11,14 +11,15 @@
     for (const s of data.sets) {
       if (!m.has(s.activity_id)) m.set(s.activity_id, { id: s.activity_id, date: new Date(s.start_time), start_time: s.start_time, reps: [], rounds: [] });
       const x = m.get(s.activity_id);
-      if (s.reps != null) { x.reps.push(s.reps); x.rounds.push(s); }
+      if (s.reps_ok != null) { x.reps.push(s.reps_ok); x.rounds.push({ ...s, reps: s.reps_ok }); }
     }
     return [...m.values()].filter((x) => x.reps.length).map((x) => ({
       ...x, avg: x.reps.reduce((a, b) => a + b, 0) / x.reps.length,
       first: x.rounds[0].reps, last: x.rounds.at(-1).reps, drop: x.rounds.length > 1 ? x.rounds.at(-1).reps - x.rounds[0].reps : null
     }));
   });
-  const dots = $derived(data.sets.filter((s) => s.reps != null).map((s) => ({ ...s, date: new Date(s.start_time) })));
+  const dots = $derived(data.sets.filter((s) => s.reps_ok != null).map((s) => ({ ...s, date: new Date(s.start_time) })));
+  const badDots = $derived(data.sets.filter((s) => s.bad).map((s) => ({ ...s, date: new Date(s.start_time) })));
   const exInfo = $derived(data.exercises.find((e) => e.exercise === data.ex));
 </script>
 
@@ -42,11 +43,12 @@
         y: { label: 'Wdh. / Intervall', grid: true, zero: true },
         marks: [
           P.dot(dots, { x: 'date', y: 'reps', r: 2, fill: 'var(--muted)', fillOpacity: 0.35 }),
+          P.dot(badDots, { x: 'date', y: 'reps', r: 3, stroke: 'var(--bad)', fill: 'none', tip: true, title: (d) => `${fmtDate(d.start_time)}: ${d.reps} Wdh.\nvermutlich Zählfehler, nicht im Schnitt` }),
           P.lineY(perSession, { x: 'date', y: 'avg', stroke: 'var(--accent-2)', strokeWidth: 2.5, marker: 'circle' }),
           P.tip(perSession, P.pointerX({ x: 'date', y: 'avg', title: (d) => `${fmtDate(d.start_time)}\nØ ${d.avg.toFixed(1)} Wdh. (${d.reps.join(' · ')})\nerste → letzte Runde: ${d.first} → ${d.last}` }))
         ]
       })} />
-      <p class="muted small">Die Uhr zählt nicht jede Übung zuverlässig. Ausreisser wie 40 Wiederholungen in 20 Sekunden sind Zählfehler.</p>
+      <p class="muted small">Die Uhr zählt nicht jede Übung zuverlässig. Rot umrandet: vermutliche Zählfehler (mehr als doppelt so viele Wiederholungen wie üblich). Sie fliessen nicht in die Schnitte ein.</p>
     </section>
 
     <section class="panel">
@@ -65,13 +67,13 @@
     <section class="panel">
       <h2>Alle Einheiten</h2>
       <div class="tablewrap"><table>
-        <thead><tr><th>Datum</th><th>Programm</th><th class="num">Runden</th><th class="num">Intervalle</th><th class="num">Wdh. gezählt</th><th class="num">Ø Puls</th><th class="num">Max</th><th class="num">Dauer</th></tr></thead>
+        <thead><tr><th>Datum</th><th>Programm</th><th class="num">Runden × Übungen</th><th class="num">Intervalle</th><th class="num">Wdh. gezählt</th><th class="num">Ø Puls</th><th class="num">Max</th><th class="num">Dauer</th></tr></thead>
         <tbody>
           {#each data.sessions as s}
             <tr class="link" onclick={() => (location.href = `/tabata/${s.id}`)}>
               <td>{fmtDate(s.start_time)}</td><td>{s.programLabel}</td>
-              <td class="num">{s.rounds}</td><td class="num">{s.intervals}</td>
-              <td class="num">{fmtNum(s.reps)} <span class="muted">({s.counted}/{s.intervals})</span></td>
+              <td class="num">{s.blocks}</td><td class="num">{s.intervals}</td>
+              <td class="num">{fmtNum(s.reps)} <span class="muted">({s.counted}/{s.intervals}){#if s.bad} · {s.bad} Zählfehler{/if}</span></td>
               <td class="num">{fmtNum(s.avg_hr)}</td><td class="num">{fmtNum(s.max_hr)}</td><td class="num">{fmtDur(s.duration_s)}</td>
             </tr>
           {/each}

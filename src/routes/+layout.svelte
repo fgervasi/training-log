@@ -6,6 +6,7 @@
     ['/', 'Übersicht'],
     ['/laeufe', 'Läufe'],
     ['/tabata', 'Tabata'],
+    ['/plaene', 'Pläne'],
     ['/uebungen', 'Übungen']
   ];
   const active = (href) => (href === '/' ? page.url.pathname === '/' : page.url.pathname.startsWith(href));

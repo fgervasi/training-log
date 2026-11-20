@@ -32,3 +32,25 @@ export function thinPoints(points, step = 10) {
 export function runPoints(id) {
   return thinPoints(getDb().prepare('SELECT t, lat, lon, alt_m, hr, speed, dist_m FROM run_point WHERE activity_id = ? ORDER BY t').all(id));
 }
+
+/**
+ * Zählfehler erkennen: Wiederholungen weit über dem Üblichen für diese Übung
+ * (mehr als das Doppelte des Medians und mindestens 8 darüber) gelten als unplausibel.
+ */
+export function repLimits() {
+  const rows = getDb().prepare('SELECT exercise, reps FROM strength_set WHERE round > 0 AND reps IS NOT NULL ORDER BY exercise, reps').all();
+  const by = {};
+  for (const r of rows) (by[r.exercise] ??= []).push(r.reps);
+  return Object.fromEntries(Object.entries(by).map(([e, v]) => {
+    const med = v[Math.floor(v.length / 2)];
+    return [e, Math.max(med * 2, med + 8)];
+  }));
+}
+
+/** Ergänzt `bad` (vermutlich Zählfehler) und `reps_ok` (Wiederholungen ohne Zählfehler) */
+export function markReps(sets, limits = repLimits()) {
+  return sets.map((s) => {
+    const bad = s.reps != null && limits[s.exercise] != null && s.reps > limits[s.exercise];
+    return { ...s, bad, reps_ok: bad ? null : s.reps };
+  });
+}

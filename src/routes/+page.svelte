@@ -1,7 +1,32 @@
 <script>
   import Plot from '$lib/components/Plot.svelte';
   import { fmtDate, fmtTime, fmtDur, fmtKm, fmtPace, fmtNum } from '$lib/format.js';
+  import { onMount } from 'svelte';
+  import { invalidateAll } from '$app/navigation';
   let { data } = $props();
+
+  const AUTO_SYNC_H = 6;   // automatisch synchronisieren, wenn der letzte Sync älter ist
+  let syncing = $state(false);
+  let syncMsg = $state('');
+  async function sync() {
+    if (syncing) return;
+    syncing = true; syncMsg = '';
+    try {
+      const r = await fetch('/api/sync', { method: 'POST' }).then((x) => x.json());
+      const g = r.garmin;
+      syncMsg = r.errors.length ? r.errors.join(' · ') : g?.new ? `${g.runs} Läufe und ${g.tabata} Tabata-Einheiten neu` : 'Keine neuen Aktivitäten';
+      await invalidateAll();
+    } catch (e) { syncMsg = `Sync fehlgeschlagen: ${e.message}`; }
+    syncing = false;
+  }
+  onMount(() => {
+    const at = data.sync?.at ? new Date(data.sync.at) : null;
+    if (!at || Date.now() - at > AUTO_SYNC_H * 3600e3) sync();
+  });
+  const ago = (iso) => {
+    const m = Math.round((Date.now() - new Date(iso)) / 60000);
+    return m < 1 ? 'gerade eben' : m < 60 ? `vor ${m} min` : m < 1440 ? `vor ${Math.round(m / 60)} h` : `am ${fmtDate(iso)}`;
+  };
   const w = $derived(data.weeks);
   const cur = $derived(w.at(-1));
   const last4 = $derived(w.slice(-5, -1));
@@ -11,7 +36,10 @@
 <main class="page">
   <div class="row">
     <h1>Übersicht</h1>
-    {#if !data.notion.plan}<span class="chip warn">Notion noch nicht synchronisiert: <code>npm run sync:notion</code></span>{/if}
+    <div class="row small">
+      <span class="muted">{#if syncing}Synchronisiere Garmin und Notion …{:else if syncMsg}{syncMsg}{:else if data.sync}Zuletzt synchronisiert {ago(data.sync.at)}{#if data.sync.errors.length} · <span class="delta-bad">{data.sync.errors.join(' · ')}</span>{/if}{:else}Noch nie synchronisiert{/if}</span>
+      <button class="btn" onclick={sync} disabled={syncing}>{syncing ? 'Läuft …' : 'Neue Aktivitäten holen'}</button>
+    </div>
   </div>
 
   {#if !data.total}

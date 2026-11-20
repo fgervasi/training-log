@@ -2,6 +2,7 @@
 // erwartet, sondern aus dem Schema gelesen; Relationen werden über die Seiten-IDs aufgelöst.
 import { Client } from '@notionhq/client';
 import { getDb } from './db.js';
+import { applyMappingFile } from './mapping.js';
 
 export const NOTION_DBS = {
   plan: { env: 'NOTION_DB_PLAN', label: 'Trainingsplan' },
@@ -54,7 +55,8 @@ export async function syncNotion(env = process.env, log = console.log) {
     const meta = await notion.databases.retrieve({ database_id: id });
     const types = Object.fromEntries(Object.entries(meta.properties).map(([n, p]) => [n, p.type]));
     const titleProp = Object.keys(types).find((n) => types[n] === 'title');
-    const dateProp = Object.keys(types).find((n) => types[n] === 'date');
+    const dateProps = Object.keys(types).filter((n) => types[n] === 'date');
+    const dateProp = dateProps.find((n) => /start|beginn|von/i.test(n)) ?? dateProps[0];
     upsertSchema.run(key, plain(meta.title), JSON.stringify(types));
 
     const pages = [];
@@ -77,5 +79,6 @@ export async function syncNotion(env = process.env, log = console.log) {
     log(`\n${cfg.label} („${plain(meta.title)}“): ${pages.length} Seiten`);
     for (const [n, t] of Object.entries(types)) log(`  - ${n}: ${t}${n === titleProp ? ' (Titel)' : ''}${n === dateProp ? ' (Datum für Verknüpfung)' : ''}`);
   }
+  applyMappingFile(db);   // Zuordnungen aus mapping/exercises.json jetzt mit Notion-IDs verknüpfen
   return summary;
 }

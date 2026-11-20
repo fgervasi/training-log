@@ -2,15 +2,15 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import AdmZip from 'adm-zip';
-import { getDb, DATA_DIR } from './db.js';
+import { getDb } from './db.js';
+import { RAW_DIR } from './paths.js';
 import { parseFit } from './fit.js';
 import { assignRoute } from './routes-detect.js';
 import { localDate } from './time.js';
 
-const RAW_DIR = path.join(DATA_DIR, 'raw');
 
-/** Dateiname ohne E-Mail-Präfix aus dem Garmin-Export */
-const cleanName = (name) => path.basename(name).replace(/^.*_(?=[^_]+\.fit$)/i, '');
+/** Dateiname ohne E-Mail-Präfix aus dem Garmin-Export ("name@domain.ch_123.fit" -> "123.fit") */
+const cleanName = (name) => path.basename(name).replace(/^[^_]*@[^_]*_/, '');
 
 function* collect(input) {
   const stat = fs.statSync(input);
@@ -29,6 +29,8 @@ export function importInputs(inputs, log = () => {}) {
   const db = getDb();
   fs.mkdirSync(RAW_DIR, { recursive: true });
   const known = new Set(db.prepare('SELECT source_file FROM activity').all().map((r) => r.source_file));
+  // dieselbe Aktivität kann aus Export und API mit verschiedenen Dateinamen kommen: zusätzlich über die Startzeit erkennen
+  const knownStarts = new Set(db.prepare('SELECT type, start_time FROM activity').all().map((r) => `${r.type}|${r.start_time}`));
   const parsed = [];
   const stats = { seen: 0, skipped: 0, ignored: 0, runs: 0, tabata: 0, errors: 0 };
 
@@ -39,6 +41,9 @@ export function importInputs(inputs, log = () => {}) {
       let buf, res;
       try { buf = f.read(); res = parseFit(buf); } catch (e) { stats.errors++; log(`Fehler in ${f.name}: ${e.message}`); continue; }
       if (!res) { stats.ignored++; continue; }
+      const startKey = `${res.type}|${res.session.start_time.toISOString()}`;
+      if (knownStarts.has(startKey)) { stats.skipped++; known.add(f.name); continue; }
+      knownStarts.add(startKey);
       parsed.push({ name: f.name, buf, ...res });
       known.add(f.name);
     }

@@ -11,7 +11,9 @@
     "build": "vite build",
     "preview": "vite preview",
     "import": "node scripts/import.js",
-    "sync:notion": "node --env-file=.env scripts/sync-notion.js"
+    "sync:notion": "node --env-file=.env scripts/sync-notion.js",
+    "sync:garmin": "node --env-file=.env scripts/sync-garmin.js",
+    "start": "node --env-file=.env build"
   },
   "dependencies": {
     "@garmin/fitsdk": "^21.221.0",

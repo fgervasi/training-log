@@ -1,0 +1,30 @@
+{
+  "_info": "Zuordnung Garmin-Übung (kategorie:nummer) -> Notion-Übung. Wird beim Start in die Datenbank übernommen und beim Speichern auf /uebungen aktualisiert. sicher=false heisst: Vorschlag, bitte prüfen.",
+  "mappings": [
+    { "exercise": "plank:34", "garmin": "mountainClimber", "notion": "Bergsteiger", "sicher": true },
+    { "exercise": "crunch:71", "garmin": "swissBallRussianTwist", "notion": "Rumpfdrehung auf dem Gymnastikball", "sicher": true },
+    { "exercise": "core:27", "garmin": "swissBallPike", "notion": "Hüftbeugung mit Pike", "sicher": true },
+    { "exercise": "plyo:24", "garmin": "medicineBallSideThrow", "notion": "Rotationswurf seitlich", "sicher": true },
+    { "exercise": "pushUp:77", "garmin": "pushUp", "notion": "Liegestütz", "sicher": true },
+    { "exercise": "row:35", "garmin": "invertedRow", "notion": "Rudern am Tisch", "sicher": true },
+    { "exercise": "benchPress:1", "garmin": "barbellBenchPress", "notion": "Bankdrücken", "sicher": true },
+    { "exercise": "benchPress:", "garmin": null, "notion": "Bankdrücken", "sicher": true },
+    { "exercise": "curl:46", "garmin": "dumbbellBicepsCurl", "notion": "Bizeps-Curl", "sicher": true },
+    { "exercise": "tricepsExtension:7", "garmin": "dumbbellLyingTricepsExtension", "notion": "Trizepsstrecken im Liegen", "sicher": true },
+    { "exercise": "crunch:83", "garmin": "crunch", "notion": "Crunch mit am Kopf angelegten Armen", "sicher": true },
+    { "exercise": "hipRaise:4", "garmin": "bridgeWithLegExtension", "notion": "Gehaltene Brücke mit alternierendem Beinheben", "sicher": true },
+    { "exercise": "plank:66", "garmin": "sidePlank", "notion": "Seitstütz mit Beinheben", "sicher": true },
+    { "exercise": "plyo:3", "garmin": "bodyWeightJumpSquat", "notion": "Kniebeugensprung", "sicher": true },
+    { "exercise": "hyperextension:12", "garmin": "kneelingSuperman", "notion": "Armheben in Bauchlage", "sicher": true },
+    { "exercise": "cardio:6", "garmin": "jumpRope", "notion": "Seilspringen", "sicher": true },
+    { "exercise": "curl:16", "garmin": "dumbbellHammerCurl", "notion": "Hammer-Curl", "sicher": true },
+    { "exercise": "row:34", "garmin": "alternatingDumbbellRow", "notion": "Wechselseitiges vorgebeugtes Kurzhantel-Rudern", "sicher": true },
+    { "exercise": "hyperextension:37", "garmin": "supermanOnSwissBall", "notion": "Hyperextensions am Gerät", "sicher": false },
+    { "exercise": "hyperextension:4", "garmin": "bentKneeReverseHyperextension", "notion": "Hyperextensions am Gerät", "sicher": false },
+    { "exercise": "chop:16", "garmin": "medicineBallWoodChops", "notion": "Rotationswurf frontal", "sicher": false },
+    { "exercise": "core:46", "garmin": "russianTwist", "notion": "Liegende Rumpfrotation mit gestreckten Beinen", "sicher": false },
+    { "exercise": "hipRaise:2", "garmin": "bentKneeSwissBallReverseHipRaise", "notion": "Gehaltene Brücke mit alternierendem Beinheben", "sicher": false },
+    { "exercise": "curl:0", "garmin": "alternatingDumbbellBicepsCurl", "notion": "Konzentrations-Curl", "sicher": false },
+    { "exercise": "shoulderPress:24", "garmin": "dumbbellShoulderPress", "notion": "Schulterrotation stehend", "sicher": false }
+  ]
+}

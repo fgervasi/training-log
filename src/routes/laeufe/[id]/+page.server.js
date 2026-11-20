@@ -1,4 +1,5 @@
-import { error } from '@sveltejs/kit';
+import { error, fail } from '@sveltejs/kit';
+import { segmentTimesFor, createSegment } from '$lib/server/segments.js';
 import { getDb } from '$lib/server/db.js';
 import { runPoints } from '$lib/server/queries.js';
 
@@ -12,5 +13,19 @@ export function load({ params, url }) {
   const vsParam = url.searchParams.get('vs');
   const vsId = vsParam === 'none' ? null : Number(vsParam) || prev?.id || null;
   const vs = vsId ? db.prepare('SELECT * FROM activity WHERE id = ?').get(vsId) : null;
-  return { run, points: runPoints(run.id), others, vs, vsPoints: vs ? runPoints(vs.id) : [] };
+  const segments = run.route_id ? segmentTimesFor(run.id, run.route_id) : [];
+  const vsSegments = vs && run.route_id ? segmentTimesFor(vs.id, run.route_id) : [];
+  return { run, points: runPoints(run.id), others, vs, vsPoints: vs ? runPoints(vs.id) : [], segments, vsSegments };
 }
+
+export const actions = {
+  segment: async ({ request, params }) => {
+    const f = await request.formData();
+    const name = String(f.get('name') || '').trim();
+    let from = Number(String(f.get('from')).replace(',', '.')), to = Number(String(f.get('to')).replace(',', '.'));
+    if (from > to) [from, to] = [to, from];
+    if (!name || !(to - from >= 0.05)) return fail(400, { error: 'Name und einen Bereich von mindestens 50 m angeben' });
+    createSegment(Number(params.id), name, from, to);
+    return { created: name };
+  }
+};

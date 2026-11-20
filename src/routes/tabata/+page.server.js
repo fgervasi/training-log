@@ -1,6 +1,7 @@
 import { getDb } from '$lib/server/db.js';
-import { exerciseLabels } from '$lib/server/queries.js';
-import { plansOn } from '$lib/server/notion-links.js';
+import { exerciseLabels, repLimits, markReps } from '$lib/server/queries.js';
+import { planFor } from '$lib/server/notion-links.js';
+import { toBlocks, blockSummary } from '$lib/blocks.js';
 
 export function load({ url }) {
   const db = getDb();
@@ -9,7 +10,15 @@ export function load({ url }) {
       SUM(s.round > 0 AND s.reps IS NOT NULL) AS counted,
       GROUP_CONCAT(DISTINCT CASE WHEN s.round > 0 THEN s.exercise END) AS exercises
     FROM activity a JOIN strength_set s ON s.activity_id = a.id WHERE a.type = 'tabata' GROUP BY a.id ORDER BY a.start_time DESC`).all()
-    .map((s) => ({ ...s, plan: plansOn(s.local_date).map((p) => p.title).join(', ') || null }));
+    .map((s) => ({ ...s, plan: planFor(s.local_date, 'strength')?.title ?? null }));
+  const limits = repLimits();
+  const setsOf = db.prepare('SELECT round, pos, exercise, reps FROM strength_set WHERE activity_id = ? AND round > 0');
+  for (const s of sessions) {
+    const ss = markReps(setsOf.all(s.id), limits);
+    s.blocks = blockSummary(toBlocks(ss));
+    s.reps = ss.reduce((a, x) => a + (x.reps_ok ?? 0), 0);
+    s.bad = ss.filter((x) => x.bad).length;
+  }
 
   // Gleiche Übungsfolge = gleiches Programm (Garmin-Workout)
   const programs = {};
@@ -28,8 +37,8 @@ export function load({ url }) {
   const exercises = db.prepare(`SELECT exercise, COUNT(DISTINCT activity_id) AS sessions, MAX(start_time) AS last, COUNT(reps) AS counted
     FROM strength_set WHERE round > 0 GROUP BY exercise ORDER BY last DESC, sessions DESC`).all();
   const ex = url.searchParams.get('ex') || exercises[0]?.exercise;
-  const sets = db.prepare(`SELECT s.activity_id, a.start_time, s.round, s.reps, s.avg_hr FROM strength_set s JOIN activity a ON a.id = s.activity_id
-    WHERE s.exercise = ? AND s.round > 0 ORDER BY a.start_time, s.round`).all(ex);
+  const sets = markReps(db.prepare(`SELECT s.activity_id, a.start_time, s.round, s.exercise, s.reps, s.avg_hr FROM strength_set s JOIN activity a ON a.id = s.activity_id
+    WHERE s.exercise = ? AND s.round > 0 ORDER BY a.start_time, s.round`).all(ex), limits);
 
   return { sessions, programs: progList, exercises, ex, sets, labels: exerciseLabels() };
 }

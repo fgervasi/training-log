@@ -75,6 +75,35 @@
     </section>
 
     <section class="panel">
+      <h2>Abschnitte</h2>
+      {#if !data.segments.length}
+        <p class="muted small">Noch keine Abschnitte. Öffne einen Lauf und lege im Höhenprofil ein Stück fest, etwa einen Anstieg. Die App misst dann seine Zeit in allen Läufen dieser Route.</p>
+      {:else}
+        <div class="grid2">
+          {#each data.segments as seg}
+            {@const res = seg.results.map((r) => ({ ...r, date: new Date(r.start_time) }))}
+            {@const sBest = res.length ? res.reduce((a, b) => (a.s < b.s ? a : b)) : null}
+            {@const sLast = res.at(-1)}
+            <div class="seg">
+              <div class="row">
+                <h3>{seg.name} <span class="muted small">km {fmtNum(seg.start_km, 2)}–{fmtNum(seg.end_km, 2)}</span></h3>
+                <form method="POST" action="?/deleteSegment"><input type="hidden" name="id" value={seg.id} /><button class="btn ghost small-btn" title="Abschnitt löschen">Löschen</button></form>
+              </div>
+              {#if res.length}
+                <p class="small">Zuletzt <b class="num">{fmtDur(sLast.s)}</b> · Bestzeit <b class="num">{fmtDur(sBest.s)}</b> am {fmtDate(sBest.start_time)} · in {res.length} von {runs.length} Läufen gefunden</p>
+                <Plot height={180} make={(w, P) => ({
+                  marginLeft: 44, x: { type: 'utc', label: null, ticks: 6 }, y: { label: 'Zeit', grid: true, tickFormat: (s) => fmtDur(s) },
+                  marks: [P.dot(res, { x: 'date', y: 's', fill: 'var(--accent)', r: 2.5 }), P.lineY(res, P.windowY({ k: 7 }, { x: 'date', y: 's', stroke: 'var(--accent)', strokeWidth: 2 })),
+                    P.tip(res, P.pointerX({ x: 'date', y: 's', title: (d) => `${fmtDate(d.start_time)}\n${fmtDur(d.s)} · Ø Puls ${fmtNum(d.avg_hr)} · max ${fmtNum(d.max_hr)}` }))]
+                })} />
+              {:else}<p class="muted small">In keinem Lauf gefunden.</p>{/if}
+            </div>
+          {/each}
+        </div>
+      {/if}
+    </section>
+
+    <section class="panel">
       <h2>Pace und Puls</h2>
       <p class="muted small">Jeder Punkt ein Lauf, je dunkler, desto neuer. Oben links = schnell bei niedrigem Puls.</p>
       <Plot height={280} make={(width, P) => ({
@@ -113,3 +142,8 @@
     </section>
   {/if}
 </main>
+
+<style>
+  .seg { display: grid; gap: 6px; min-width: 0; }
+  .small-btn { padding: 3px 8px; font-size: 12px; }
+</style>

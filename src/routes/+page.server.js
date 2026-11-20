@@ -1,6 +1,7 @@
 import { getDb } from '$lib/server/db.js';
 import { weekOf } from '$lib/server/queries.js';
 import { notionStatus } from '$lib/server/notion-links.js';
+import { lastSync } from '$lib/server/sync.js';
 
 export function load() {
   const db = getDb();
@@ -24,5 +25,5 @@ export function load() {
       list.push(weeks[w] ?? { week: w, km: 0, runs: 0, tabata: 0, minutes: 0 });
     }
   }
-  return { recent: acts.slice(0, 12), weeks: list, total: acts.length, notion: notionStatus() };
+  return { recent: acts.slice(0, 12), weeks: list, total: acts.length, notion: notionStatus(), sync: lastSync() };
 }

@@ -75,7 +75,7 @@ session_program activity_id, tabata_program_id                     -- per Datum 
 
 ## Umsetzungsstand (v0.1)
 - Umgesetzt: A1 (Import aus Export), A2, L1, L2 (Meter pro Herzschlag), L4, L5, K1, K2, K3 (Programme nach Übungsfolge, Name aus Notion), K4
-- Offen: L3 Abschnittszeiten, Import über die Garmin Personal API
+- Umgesetzt in v0.2: L3 Abschnittszeiten, Import über die Garmin Personal API (auch per Knopf/automatisch), Plan gegen Ist, Zählfehler-Erkennung, Blockerkennung nach Übungsfolge
 - Erkenntnis aus den Daten: Die Einheiten sind Zirkel aus 8–9 Übungen à 20/10 s in 5 Runden (nicht 8 Intervalle derselben Übung). Garmin speichert pro Satz Kategorie und Übungsname, z. B. `plank:34` = Mountain Climber.
 
 ## Offene Fragen

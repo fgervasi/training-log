@@ -2,8 +2,11 @@
 import Database from 'better-sqlite3';
 import fs from 'node:fs';
 import path from 'node:path';
+import { applyMappingFile } from './mapping.js';
+import { DATA_DIR } from './paths.js';
+import { reprocessSets, SETS_VERSION } from './reprocess.js';
 
-export const DATA_DIR = path.resolve(process.env.TRAINING_DATA_DIR || 'data');
+export { DATA_DIR };
 const DB_FILE = path.join(DATA_DIR, 'training.db');
 
 const SCHEMA = `
@@ -70,11 +73,24 @@ CREATE TABLE IF NOT EXISTS notion_schema (
   props  TEXT NOT NULL                     -- JSON {Feldname: Typ}
 );
 
+CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT);
+
+-- Abschnitte einer Route (z. B. ein Anstieg), deren Zeit über alle Läufe verglichen wird
+CREATE TABLE IF NOT EXISTS segment (
+  id        INTEGER PRIMARY KEY,
+  route_id  INTEGER NOT NULL REFERENCES route(id) ON DELETE CASCADE,
+  name      TEXT NOT NULL,
+  start_km  REAL, end_km REAL,
+  start_lat REAL NOT NULL, start_lon REAL NOT NULL,
+  end_lat   REAL NOT NULL, end_lon REAL NOT NULL
+);
+
 -- Zuordnung Garmin-Übung -> Notion-Übung (einmal pflegen, dann automatisch)
 CREATE TABLE IF NOT EXISTS exercise_map (
   exercise       TEXT PRIMARY KEY,         -- 'kategorie:nummer'
   notion_page_id TEXT REFERENCES notion_page(id),
-  label          TEXT                      -- eigener Name, falls gewünscht
+  label          TEXT,                     -- eigener Name, falls gewünscht
+  checked        INTEGER NOT NULL DEFAULT 1 -- 0 = Vorschlag, noch nicht bestätigt
 );
 `;
 
@@ -86,5 +102,23 @@ export function getDb() {
   db.pragma('journal_mode = WAL');
   db.pragma('foreign_keys = ON');
   db.exec(SCHEMA);
+  // Migration: Vorschläge (checked = 0) von bestätigten Zuordnungen unterscheiden
+  if (!db.prepare('PRAGMA table_info(exercise_map)').all().some((c) => c.name === 'checked')) {
+    db.exec('ALTER TABLE exercise_map ADD COLUMN checked INTEGER NOT NULL DEFAULT 1');
+  }
+  applyMappingFile(db);
+  // Tabata-Sätze neu berechnen, wenn sich die Rundenerkennung geändert hat
+  if (Number(getMeta('sets_version') ?? 1) < SETS_VERSION) {
+    reprocessSets(db);
+    setMeta('sets_version', String(SETS_VERSION));
+  }
   return db;
+}
+
+export function getMeta(key) {
+  return getDb().prepare('SELECT value FROM meta WHERE key = ?').get(key)?.value ?? null;
+}
+
+export function setMeta(key, value) {
+  getDb().prepare('INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(key, value);
 }
