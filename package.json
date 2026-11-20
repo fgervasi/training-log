@@ -1,0 +1,32 @@
+{
+  "name": "training-log",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20.6"
+  },
+  "scripts": {
+    "dev": "vite dev",
+    "build": "vite build",
+    "preview": "vite preview",
+    "import": "node scripts/import.js",
+    "sync:notion": "node --env-file=.env scripts/sync-notion.js"
+  },
+  "dependencies": {
+    "@garmin/fitsdk": "^21.221.0",
+    "@notionhq/client": "^2.2.15",
+    "@observablehq/plot": "^0.6.17",
+    "adm-zip": "^0.5.16",
+    "better-sqlite3": "^11.10.0",
+    "d3": "^7.9.0",
+    "maplibre-gl": "^5.6.0"
+  },
+  "devDependencies": {
+    "@sveltejs/adapter-node": "^5.2.12",
+    "@sveltejs/kit": "^2.21.0",
+    "@sveltejs/vite-plugin-svelte": "^5.0.3",
+    "svelte": "^5.33.0",
+    "vite": "^6.3.5"
+  }
+}
