@@ -7,6 +7,7 @@ import { RAW_DIR } from './paths.js';
 import { parseFit } from './fit.js';
 import { assignRoute } from './routes-detect.js';
 import { localDate } from './time.js';
+import { insertLaps } from './reprocess.js';
 
 
 /** Dateiname ohne E-Mail-Präfix aus dem Garmin-Export ("name@domain.ch_123.fit" -> "123.fit") */
@@ -52,8 +53,8 @@ export function importInputs(inputs, log = () => {}) {
   // chronologisch, damit Routen in sinnvoller Reihenfolge entstehen
   parsed.sort((a, b) => a.session.start_time - b.session.start_time);
 
-  const insAct = db.prepare(`INSERT INTO activity (source_file, type, start_time, local_date, duration_s, distance_m, avg_hr, max_hr, ascent_m, avg_speed, training_effect, route_id)
-    VALUES (@source_file, @type, @start_time, @local_date, @duration_s, @distance_m, @avg_hr, @max_hr, @ascent_m, @avg_speed, @training_effect, @route_id)`);
+  const insAct = db.prepare(`INSERT INTO activity (source_file, type, start_time, local_date, duration_s, distance_m, avg_hr, max_hr, ascent_m, avg_speed, training_effect, route_id, workout)
+    VALUES (@source_file, @type, @start_time, @local_date, @duration_s, @distance_m, @avg_hr, @max_hr, @ascent_m, @avg_speed, @training_effect, @route_id, @workout)`);
   const insPt = db.prepare('INSERT INTO run_point (activity_id, t, lat, lon, alt_m, hr, speed, dist_m) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
   const insSet = db.prepare(`INSERT INTO strength_set (activity_id, idx, round, pos, start_time, duration_s, exercise, category, exercise_name, reps, avg_hr, max_hr)
     VALUES (@activity_id, @idx, @round, @pos, @start_time, @duration_s, @exercise, @category, @exercise_name, @reps, @avg_hr, @max_hr)`);
@@ -63,7 +64,7 @@ export function importInputs(inputs, log = () => {}) {
       const s = it.session;
       const route_id = it.type === 'run' ? assignRoute(db, it.points, s.distance_m) : null;
       const id = Number(insAct.run({ ...s, start_time: s.start_time.toISOString(), local_date: localDate(s.start_time), source_file: it.name, type: it.type, route_id }).lastInsertRowid);
-      if (it.type === 'run') for (const p of it.points) insPt.run(id, p.t, p.lat, p.lon, p.alt_m, p.hr, p.speed, p.dist_m);
+      if (it.type === 'run') { for (const p of it.points) insPt.run(id, p.t, p.lat, p.lon, p.alt_m, p.hr, p.speed, p.dist_m); insertLaps(db, id, it.laps); }
       else for (const st of it.sets) insSet.run({ ...st, activity_id: id });
       fs.writeFileSync(path.join(RAW_DIR, it.name), it.buf);
       stats[it.type === 'run' ? 'runs' : 'tabata']++;

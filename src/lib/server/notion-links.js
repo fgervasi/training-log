@@ -60,7 +60,7 @@ export function dateRange(page) {
   return { start, end: e ? dateOnly(page.props[e]) : start };
 }
 
-const KIND = { strength: /tabata|strength|kraft/i, run: /run|lauf/i };
+export const KIND = { strength: /tabata|strength|kraft/i, run: /run|lauf/i };
 
 /** Pläne, die an `date` gelten und zur Art passen; der mit den meisten verknüpften Übungen zuerst */
 export function plansFor(date, kind = 'strength') {
@@ -75,6 +75,19 @@ export function plansFor(date, kind = 'strength') {
 }
 
 export const planFor = (date, kind) => plansFor(date, kind)[0] ?? null;
+
+/**
+ * Plan zu einer Aktivität: Trägt das Garmin-Workout eine Nummer ("Tabata #15", "Tabata 13"),
+ * gilt der Kraftplan mit dieser Nummer ("Kraftraining #15"), sonst der am Datum gültige Plan.
+ */
+export function planForActivity(date, workout, kind = 'strength') {
+  const num = workout?.match(/#?\s*(\d+)\s*$/)?.[1];
+  if (num && kind === 'strength') {
+    const byNum = strengthPlans().find((p) => new RegExp(`#\\s*${num}(\\D|$)`).test(p.title));
+    if (byNum) return byNum;
+  }
+  return planFor(date, kind);
+}
 
 const pick = (props, re) => { const k = Object.keys(props).find((n) => re.test(n)); return k ? props[k] : null; };
 
@@ -107,8 +120,16 @@ export function plannedUebungIds() {
   return ids;
 }
 
-/** Alle Kraft-/Tabata-Pläne mit Zeitraum, neueste zuerst (ohne leere Seiten) */
+let plansCache = { key: null, value: null };
+/** Alle Kraft-/Tabata-Pläne mit Zeitraum, neueste zuerst (ohne leere Seiten). Zwischengespeichert bis zum nächsten Notion-Sync. */
 export function strengthPlans() {
+  const key = getDb().prepare('SELECT MAX(synced_at) k FROM notion_page').get().k;
+  if (plansCache.key === key && plansCache.value) return plansCache.value;
+  plansCache = { key, value: computeStrengthPlans() };
+  return plansCache.value;
+}
+
+function computeStrengthPlans() {
   const schema = schemaOf('plan')?.props || {};
   const typeProp = Object.keys(schema).find((n) => /^typ(e)?$/i.test(n) && (schema[n] === 'select' || schema[n] === 'status'));
   return pagesOf('plan')
@@ -116,4 +137,23 @@ export function strengthPlans() {
     .filter((p) => p.range.start && (!typeProp || KIND.strength.test(p.props[typeProp] || '')))
     .filter((p) => planExercises(p).length)
     .sort((a, b) => b.range.start.localeCompare(a.range.start));
+}
+
+
+/** Lauf-Pläne (Type z. B. "Running") mit Zeitraum */
+export function runningPlans() {
+  const schema = schemaOf('plan')?.props || {};
+  const typeProp = Object.keys(schema).find((n) => /^typ(e)?$/i.test(n) && (schema[n] === 'select' || schema[n] === 'status'));
+  if (!typeProp) return [];
+  return pagesOf('plan')
+    .filter((p) => KIND.run.test(p.props[typeProp] || ''))
+    .map((p) => ({ ...p, range: dateRange(p), kind: 'run', title: (p.title || '').trim() }))
+    .filter((p) => p.range.start)
+    .sort((a, b) => b.range.start.localeCompare(a.range.start));
+}
+
+/** Wortstämme (erste 4 Buchstaben, Wörter ab 4 Zeichen) für den Vergleich Plan <-> Garmin-Workout */
+export function stems(text) {
+  return new Set((text || '').toLowerCase().normalize('NFD').replace(/[^a-z0-9 ]/g, ' ').split(/\s+/)
+    .filter((w) => w.length >= 4 && !['running', 'training'].includes(w)).map((w) => w.slice(0, 4)));
 }

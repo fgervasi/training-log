@@ -30,7 +30,8 @@ CREATE INDEX IF NOT EXISTS activity_type_date ON activity(type, start_time);
 CREATE TABLE IF NOT EXISTS route (
   id     INTEGER PRIMARY KEY,
   name   TEXT NOT NULL,
-  cells  TEXT NOT NULL                     -- JSON: Rasterzellen der Referenzstrecke
+  cells  TEXT NOT NULL,                    -- JSON: Rasterzellen der Referenzstrecke
+  auto_name INTEGER NOT NULL DEFAULT 1     -- 1 = Name folgt dem Notion-Plan, 0 = von Hand umbenannt
 );
 
 CREATE TABLE IF NOT EXISTS run_point (
@@ -75,6 +76,18 @@ CREATE TABLE IF NOT EXISTS notion_schema (
 
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT);
 
+-- Runden eines Laufs (Garmin-Laps), z. B. die Intervalle des Norwegischen Protokolls
+CREATE TABLE IF NOT EXISTS lap (
+  activity_id INTEGER NOT NULL REFERENCES activity(id) ON DELETE CASCADE,
+  idx         INTEGER NOT NULL,
+  intensity   TEXT,                        -- warmup | active | recovery | cooldown | rest
+  step_index  INTEGER,
+  start_t     REAL, duration_s REAL, distance_m REAL, start_dist REAL,
+  avg_hr      REAL, max_hr REAL, avg_speed REAL, ascent_m REAL,
+  target_hr_low INTEGER, target_hr_high INTEGER,
+  PRIMARY KEY (activity_id, idx)
+);
+
 -- Abschnitte einer Route (z. B. ein Anstieg), deren Zeit über alle Läufe verglichen wird
 CREATE TABLE IF NOT EXISTS segment (
   id        INTEGER PRIMARY KEY,
@@ -105,6 +118,13 @@ export function getDb() {
   // Migration: Vorschläge (checked = 0) von bestätigten Zuordnungen unterscheiden
   if (!db.prepare('PRAGMA table_info(exercise_map)').all().some((c) => c.name === 'checked')) {
     db.exec('ALTER TABLE exercise_map ADD COLUMN checked INTEGER NOT NULL DEFAULT 1');
+  }
+  if (!db.prepare('PRAGMA table_info(route)').all().some((c) => c.name === 'auto_name')) {
+    db.exec('ALTER TABLE route ADD COLUMN auto_name INTEGER NOT NULL DEFAULT 1');
+    db.exec("UPDATE route SET auto_name = 0 WHERE name NOT GLOB 'Route [0-9]*'");   // eigene Namen behalten
+  }
+  if (!db.prepare('PRAGMA table_info(activity)').all().some((c) => c.name === 'workout')) {
+    db.exec('ALTER TABLE activity ADD COLUMN workout TEXT');   // Name des Garmin-Workouts
   }
   applyMappingFile(db);
   // Tabata-Sätze neu berechnen, wenn sich die Rundenerkennung geändert hat

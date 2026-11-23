@@ -42,11 +42,11 @@ Die Übersicht holt neue Aktivitäten aus Garmin und Notion automatisch, wenn de
 | Seite | Inhalt |
 |---|---|
 | Übersicht | Sync mit Garmin und Notion, Kilometer und Tabata-Einheiten pro Woche, letzte Aktivitäten |
-| Läufe | Routen werden automatisch erkannt (umbenennbar). Zeit im Verlauf, Fitness als Meter pro Herzschlag, Pace gegen Puls, Abschnittszeiten über alle Läufe |
-| Lauf-Detail | Karte (swisstopo), Höhenprofil, Pace und Puls entlang der Strecke, Vergleich mit einem anderen Lauf, Kilometerzeiten. Zwei Klicks ins Höhenprofil legen einen Abschnitt an |
+| Läufe | Routen werden automatisch erkannt (umbenennbar). Zeit im Verlauf, Fitness als Meter pro Herzschlag, Pace gegen Puls, Intervalle (Verlauf je Belastungsintervall), Zeit im Zielpuls-Bereich, Abschnittszeiten über alle Läufe |
+| Lauf-Detail | Karte (swisstopo), Höhenprofil, Pace und Puls entlang der Strecke, Vergleich mit einem anderen Lauf, Runden/Intervalle aus dem Garmin-Workout, Kilometerzeiten. Zwei Klicks ins Höhenprofil legen einen Abschnitt an |
 | Tabata | Wiederholungen pro Intervall je Übung über die Zeit, Programme, alle Einheiten |
 | Tabata-Detail | Blöcke mit Raster Runde × Übung, Zählfehler durchgestrichen, Vergleich mit der vorigen Einheit desselben Programms, Puls pro Intervall, Eintrag aus dem Notion-Trainingsplan |
-| Pläne | Plan gegen Ist: wie oft jede Übung eines Notion-Plans gemacht wurde, Trend, Übungen ausserhalb des Plans |
+| Pläne | Plan gegen Ist: Kraftpläne (Übungen gemacht, Trend, Übungen ausserhalb des Plans) und Laufpläne (Läufe pro Woche, Intervalle, Zielpuls) |
 | Übungen | Garmin-Übung einmal einer Notion-Übung zuordnen oder umbenennen |
 
 ## Aufbau

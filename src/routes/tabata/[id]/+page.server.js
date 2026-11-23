@@ -1,7 +1,7 @@
 import { error } from '@sveltejs/kit';
 import { getDb } from '$lib/server/db.js';
 import { exerciseLabels, repLimits, markReps } from '$lib/server/queries.js';
-import { planFor, planExercises } from '$lib/server/notion-links.js';
+import { planForActivity, planExercises } from '$lib/server/notion-links.js';
 
 export function load({ params }) {
   const db = getDb();
@@ -15,7 +15,7 @@ export function load({ params }) {
     WHERE a.type = 'tabata' AND a.start_time < ? AND s.round > 0 GROUP BY a.id ORDER BY a.start_time DESC LIMIT 30`).all(a.start_time);
   const prev = prevCandidates.find((p) => p.ex.split(',').sort().join(',') === exKey);
   const prevSets = prev ? markReps(db.prepare('SELECT * FROM strength_set WHERE activity_id = ? ORDER BY idx').all(prev.id), limits) : [];
-  const plan = planFor(a.local_date, 'strength');
+  const plan = planForActivity(a.local_date, a.workout);
   const mapRows = db.prepare('SELECT exercise, notion_page_id, label FROM exercise_map').all();
   const used = new Set(sets.filter((s) => s.round > 0).map((s) => s.exercise));
   const usedNotion = new Set(mapRows.filter((m) => used.has(m.exercise) && m.notion_page_id).map((m) => m.notion_page_id));

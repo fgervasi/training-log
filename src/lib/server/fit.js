@@ -35,7 +35,8 @@ export function parseFit(buffer) {
     max_hr: s.maxHeartRate ?? null,
     ascent_m: s.totalAscent ?? null,
     avg_speed: s.enhancedAvgSpeed || s.avgSpeed || null,
-    training_effect: s.totalTrainingEffect ?? null
+    training_effect: s.totalTrainingEffect ?? null,
+    workout: messages.workoutMesgs?.[0]?.wktName?.trim() || null
   };
 
   if (s.sport === 'running') {
@@ -53,7 +54,7 @@ export function parseFit(buffer) {
       });
     }
     if (points.length < 30) return null;
-    return { type: 'run', session, points };
+    return { type: 'run', session, points, laps: buildLaps(messages, start, points) };
   }
 
   const setMesgs = messages.setMesgs || [];
@@ -134,4 +135,29 @@ function buildSets(setMesgs, records) {
 export function parseSets(buffer) {
   const res = parseFit(buffer);
   return res?.type === 'tabata' ? res.sets : null;
+}
+
+/** Runden (Laps) eines Laufs mit Phase aus dem Garmin-Workout und ggf. Zielpuls */
+function buildLaps(messages, start, points) {
+  const steps = messages.workoutStepMesgs || [];
+  const bpm = (v) => (v > 40 && v < 230 ? v : null);
+  const distAt = (t) => { let d = null; for (const p of points) { if (p.t > t) break; d = p.dist_m; } return d ?? 0; };
+  return (messages.lapMesgs || []).map((l, idx) => {
+    const step = l.wktStepIndex != null ? steps[l.wktStepIndex] : null;
+    const hrTarget = step?.targetType === 'heartRate';
+    const t0 = (l.startTime - start) / 1000;
+    return {
+      idx, intensity: l.intensity ?? step?.intensity ?? null, step_index: l.wktStepIndex ?? null,
+      start_t: t0, duration_s: l.totalTimerTime ?? null, distance_m: l.totalDistance ?? null,
+      start_dist: distAt(t0), avg_hr: l.avgHeartRate ?? null, max_hr: l.maxHeartRate ?? null,
+      avg_speed: l.enhancedAvgSpeed ?? l.avgSpeed ?? null, ascent_m: l.totalAscent ?? null,
+      target_hr_low: hrTarget ? bpm(step.customTargetValueLow) : null, target_hr_high: hrTarget ? bpm(step.customTargetValueHigh) : null
+    };
+  });
+}
+
+/** Nur Runden und Workout-Name neu berechnen (Neuverarbeitung gespeicherter Läufe) */
+export function parseRunExtras(buffer) {
+  const res = parseFit(buffer);
+  return res?.type === 'run' ? { laps: res.laps, workout: res.session.workout } : null;
 }

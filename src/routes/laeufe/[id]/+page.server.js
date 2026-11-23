@@ -1,5 +1,6 @@
 import { error, fail } from '@sveltejs/kit';
 import { segmentTimesFor, createSegment } from '$lib/server/segments.js';
+import { lapsOf, zoneTime } from '$lib/server/laps.js';
 import { getDb } from '$lib/server/db.js';
 import { runPoints } from '$lib/server/queries.js';
 
@@ -15,7 +16,9 @@ export function load({ params, url }) {
   const vs = vsId ? db.prepare('SELECT * FROM activity WHERE id = ?').get(vsId) : null;
   const segments = run.route_id ? segmentTimesFor(run.id, run.route_id) : [];
   const vsSegments = vs && run.route_id ? segmentTimesFor(vs.id, run.route_id) : [];
-  return { run, points: runPoints(run.id), others, vs, vsPoints: vs ? runPoints(vs.id) : [], segments, vsSegments };
+  const laps = lapsOf(run.id);
+  return { run, points: runPoints(run.id), others, vs, vsPoints: vs ? runPoints(vs.id) : [], segments, vsSegments,
+    laps, vsLaps: vs ? lapsOf(vs.id) : [], zone: zoneTime(run.id, laps) };
 }
 
 export const actions = {

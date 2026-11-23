@@ -1,16 +1,16 @@
 import { getDb } from '$lib/server/db.js';
 import { exerciseLabels, repLimits, markReps } from '$lib/server/queries.js';
-import { planFor } from '$lib/server/notion-links.js';
+import { planForActivity } from '$lib/server/notion-links.js';
 import { toBlocks, blockSummary } from '$lib/blocks.js';
 
 export function load({ url }) {
   const db = getDb();
-  const sessions = db.prepare(`SELECT a.id, a.start_time, a.local_date, a.duration_s, a.avg_hr, a.max_hr, a.training_effect,
+  const sessions = db.prepare(`SELECT a.id, a.start_time, a.local_date, a.workout, a.duration_s, a.avg_hr, a.max_hr, a.training_effect,
       MAX(s.round) AS rounds, SUM(s.round > 0) AS intervals, SUM(CASE WHEN s.round > 0 THEN s.reps END) AS reps,
       SUM(s.round > 0 AND s.reps IS NOT NULL) AS counted,
       GROUP_CONCAT(DISTINCT CASE WHEN s.round > 0 THEN s.exercise END) AS exercises
     FROM activity a JOIN strength_set s ON s.activity_id = a.id WHERE a.type = 'tabata' GROUP BY a.id ORDER BY a.start_time DESC`).all()
-    .map((s) => ({ ...s, plan: planFor(s.local_date, 'strength')?.title ?? null }));
+    .map((s) => ({ ...s, plan: planForActivity(s.local_date, s.workout)?.title ?? null }));
   const limits = repLimits();
   const setsOf = db.prepare('SELECT round, pos, exercise, reps FROM strength_set WHERE activity_id = ? AND round > 0');
   for (const s of sessions) {

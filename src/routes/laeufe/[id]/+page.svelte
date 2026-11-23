@@ -13,6 +13,10 @@
     const km = Math.round(hover.km * 100) / 100;
     if (segFrom == null || segTo != null) { segFrom = km; segTo = null; } else { segTo = km; }
   }
+  // Belastungsrunden als Bereiche (km) für die Diagramme
+  const workBands = $derived(data.laps.filter((l) => l.work && l.distance_m).map((l) => ({ x1: l.start_dist / 1000, x2: (l.start_dist + l.distance_m) / 1000, n: l.n })));
+  const bandMarks = (P) => (workBands.length > 1 ? [P.rectX(workBands, { x1: 'x1', x2: 'x2', fill: 'var(--accent)', fillOpacity: 0.07 })] : []);
+  const vsLap = (l) => data.vsLaps.find((v) => v.idx === l.idx && v.intensity === l.intensity);
   const segRange = $derived(segFrom != null && segTo != null ? [Math.min(segFrom, segTo), Math.max(segFrom, segTo)] : null);
 
   const label = (a) => fmtDate(a.start_time);
@@ -92,7 +96,7 @@
       <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
       <div class="pick" onclick={pick}>
       <Plot height={150} onhover={(v) => (hover = v)} make={(w, P) => ({ ...common(P), y: { label: 'm ü. M.', grid: true, zero: false },
-        marks: [...(segRange ? [P.rectX([segRange], { x1: (d) => d[0], x2: (d) => d[1], fill: 'var(--accent-2)', fillOpacity: 0.18 })] : []), ...(segFrom != null && segTo == null ? [P.ruleX([segFrom], { stroke: 'var(--accent-2)', strokeWidth: 2 })] : []),P.areaY(A, { x: 'km', y: 'alt_m', fill: 'var(--soft)', y1: (A.length ? Math.min(...A.map((p) => p.alt_m)) - 5 : 0) }), P.lineY(both, { x: 'km', y: 'alt_m', stroke: 'lauf' }),
+        marks: [...bandMarks(P), ...(segRange ? [P.rectX([segRange], { x1: (d) => d[0], x2: (d) => d[1], fill: 'var(--accent-2)', fillOpacity: 0.18 })] : []), ...(segFrom != null && segTo == null ? [P.ruleX([segFrom], { stroke: 'var(--accent-2)', strokeWidth: 2 })] : []),P.areaY(A, { x: 'km', y: 'alt_m', fill: 'var(--soft)', y1: (A.length ? Math.min(...A.map((p) => p.alt_m)) - 5 : 0) }), P.lineY(both, { x: 'km', y: 'alt_m', stroke: 'lauf' }),
           P.ruleX(A, P.pointerX({ x: 'km', stroke: 'var(--muted)' })), P.dot(A, P.pointerX({ x: 'km', y: 'alt_m', fill: 'var(--fg)', r: 3 }))] })} />
       </div>
       {#if segFrom != null}
@@ -106,14 +110,44 @@
       {#if form?.error}<p class="small delta-bad">{form.error}</p>{:else if form?.created}<p class="small delta-good">Abschnitt „{form.created}“ gespeichert. Er gilt für alle Läufe dieser Route.</p>{/if}
       <h3>Pace</h3>
       <Plot height={150} onhover={(v) => (hover = v)} make={(w, P) => ({ ...common(P), y: { label: 'min/km', grid: true, reverse: true, tickFormat: fmtMin, ticks: 5 },
-        marks: [P.lineY(both.filter((p) => p.pace), { x: 'km', y: 'pace', stroke: 'lauf', z: 'lauf' }),
+        marks: [...bandMarks(P), P.lineY(both.filter((p) => p.pace), { x: 'km', y: 'pace', stroke: 'lauf', z: 'lauf' }),
           P.ruleX(A, P.pointerX({ x: 'km', stroke: 'var(--muted)' })), P.tip(A.filter((p) => p.pace), P.pointerX({ x: 'km', y: 'pace', title: (p) => `km ${p.km.toFixed(2)}\nPace ${fmtMin(p.pace)} · Puls ${p.hr ?? '–'}` }))] })} />
       <h3>Puls</h3>
       <Plot height={150} onhover={(v) => (hover = v)} make={(w, P) => ({ ...common(P), y: { label: 'bpm', grid: true, zero: false },
-        marks: [P.lineY(both.filter((p) => p.hr), { x: 'km', y: 'hr', stroke: 'lauf', z: 'lauf' }),
+        marks: [...bandMarks(P), ...(data.zone ? [P.rectY([data.zone], { y1: 'low', y2: 'high', fill: 'var(--good)', fillOpacity: 0.1 })] : []), P.lineY(both.filter((p) => p.hr), { x: 'km', y: 'hr', stroke: 'lauf', z: 'lauf' }),
           P.ruleX(A, P.pointerX({ x: 'km', stroke: 'var(--muted)' })), P.dot(A.filter((p) => p.hr), P.pointerX({ x: 'km', y: 'hr', fill: 'var(--fg)', r: 3 }))] })} />
     </div>
   </section>
+
+  {#if data.laps.length > 1}
+    <section class="panel">
+      <div class="row">
+        <h2>Runden{#if data.run.workout}{' '}<span class="muted small">· {data.run.workout}</span>{/if}</h2>
+        {#if data.zone}<span class="small">Zielpuls {data.zone.low}–{data.zone.high} bpm: <b class="num">{Math.round(data.zone.share * 100)} %</b> im Bereich · {fmtDur(data.zone.below)} darunter · {fmtDur(data.zone.above)} darüber</span>{/if}
+      </div>
+      <p class="muted small">Belastungsrunden sind in den Diagrammen hellblau hinterlegt{data.zone ? ', der Zielpuls grün' : ''}.{#if data.vs}{' '}Differenz zum Lauf vom {label(data.vs)}: grün = schneller bzw. tieferer Puls.{/if}</p>
+      <div class="tablewrap"><table>
+        <thead><tr><th>Phase</th><th class="num">Dauer</th><th class="num">Distanz</th><th class="num">Pace</th>{#if data.vs}<th class="num">Δ Pace</th>{/if}<th class="num">Ø Puls</th>{#if data.vs}<th class="num">Δ Puls</th>{/if}<th class="num">Max</th><th class="num">Aufstieg</th></tr></thead>
+        <tbody>
+          {#each data.laps as l}
+            {@const o = vsLap(l)}
+            {@const dp = o?.avg_speed && l.avg_speed ? 1000 / l.avg_speed - 1000 / o.avg_speed : null}
+            <tr class:work={l.work}>
+              <td>{l.phase}{l.n ? ` ${l.n}` : ''}</td>
+              <td class="num">{fmtDur(l.duration_s)}</td>
+              <td class="num">{fmtNum(l.distance_m)} m</td>
+              <td class="num">{fmtPace(l.avg_speed)}</td>
+              {#if data.vs}<td class="num {cls(dp)}">{dp != null ? fmtDelta(dp, 0, ' s') : ''}</td>{/if}
+              <td class="num">{fmtNum(l.avg_hr)}</td>
+              {#if data.vs}<td class="num {cls(o?.avg_hr != null ? l.avg_hr - o.avg_hr : null)}">{o?.avg_hr != null ? fmtDelta(l.avg_hr - o.avg_hr, 0) : ''}</td>{/if}
+              <td class="num">{fmtNum(l.max_hr)}</td>
+              <td class="num">{fmtNum(l.ascent_m)} m</td>
+            </tr>
+          {/each}
+        </tbody>
+      </table></div>
+    </section>
+  {/if}
 
   {#if data.segments.length}
     <section class="panel">
@@ -162,5 +196,6 @@
 
 <style>
   .pick { cursor: crosshair; }
+  tr.work td:first-child { font-weight: 650; color: var(--accent); }
   .segform input[type=text] { padding: 4px 6px; }
 </style>

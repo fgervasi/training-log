@@ -68,12 +68,14 @@ export async function syncNotion(env = process.env, log = console.log) {
     } while (cursor);
 
     db.transaction(() => {
-      db.prepare('DELETE FROM notion_page WHERE db = ? AND synced_at < ?').run(key, now);
       for (const pg of pages) {
         const props = Object.fromEntries(Object.entries(pg.properties).map(([n, p]) => [n, simplify(p)]));
         upsertPage.run({ id: pg.id, db: key, title: titleProp ? props[titleProp] : null, date: dateProp ? dateOnly(props[dateProp]) : null,
           props: JSON.stringify(props), url: pg.url, synced_at: now });
       }
+      // In Notion gelöschte Seiten entfernen; Zuordnungen darauf vorher lösen (Fremdschlüssel)
+      db.prepare('UPDATE exercise_map SET notion_page_id = NULL WHERE notion_page_id IN (SELECT id FROM notion_page WHERE db = ? AND synced_at < ?)').run(key, now);
+      db.prepare('DELETE FROM notion_page WHERE db = ? AND synced_at < ?').run(key, now);
     })();
     summary[key] = pages.length;
     log(`\n${cfg.label} („${plain(meta.title)}“): ${pages.length} Seiten`);

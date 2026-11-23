@@ -1,6 +1,6 @@
 <script>
   import Plot from '$lib/components/Plot.svelte';
-  import { fmtDate, fmtTime, fmtDur, fmtKm, fmtPace, fmtNum, paceMin } from '$lib/format.js';
+  import { fmtDate, fmtTime, fmtDur, fmtKm, fmtPace, fmtNum, fmtDelta, paceMin } from '$lib/format.js';
   let { data } = $props();
   const route = $derived(data.routes.find((r) => r.id === data.sel));
   const runs = $derived(data.runs.map((r) => ({
@@ -13,7 +13,20 @@
   })));
   const best = $derived(runs.length ? runs.reduce((a, b) => (a.duration_s < b.duration_s ? a : b)) : null);
   let editing = $state(false);
-  const fmtMin = (m) => `${Math.floor(m)}:${String(Math.round((m % 1) * 60)).padStart(2, '0')}`;
+
+  // Intervalle: Verlauf je Belastungsintervall, Vergleich erste vs. letzte 6 Läufe
+  const iv = $derived(data.intervals.map((r) => ({ ...r, date: new Date(r.start_time), pace: paceMin(r.avg_speed), Intervall: `Intervall ${r.n}` })));
+  const ivTable = $derived.by(() => {
+    const ns = [...new Set(iv.map((r) => r.n))].sort((a, b) => a - b);
+    const avg = (rows, k) => (rows.length ? rows.reduce((s, r) => s + (r[k] ?? 0), 0) / rows.length : null);
+    return ns.map((n) => {
+      const rows = iv.filter((r) => r.n === n);
+      const first = rows.slice(0, 6), last = rows.slice(-6);
+      return { n, hr0: avg(first, 'avg_hr'), hr1: avg(last, 'avg_hr'), sp0: avg(first, 'avg_speed'), sp1: avg(last, 'avg_speed') };
+    });
+  });
+  const zs = $derived(data.zones.map((z) => ({ ...z, date: new Date(z.start_time), share: z.zone.share * 100 })));
+  const fmtMin = (m) => (m >= 60 ? fmtDur(m * 60) : `${Math.floor(m)}:${String(Math.round((m % 1) * 60)).padStart(2, '0')}`);
 </script>
 
 <main class="page">
@@ -39,6 +52,7 @@
         </form>
       {:else}
         <h2>{route.name} <button class="btn ghost" onclick={() => (editing = true)}>Umbenennen</button></h2>
+        {#if !route.auto_name}<form method="POST" action="?/autoName"><input type="hidden" name="id" value={route.id} /><button class="btn ghost" title="Name wieder aus dem Notion-Plan übernehmen">Name aus Notion</button></form>{/if}
       {/if}
       <span class="muted small">{route.n} Läufe · Ø {fmtKm(route.dist)} km{best ? ` · Bestzeit ${fmtDur(best.duration_s)} am ${fmtDate(best.start_time)}` : ''}</span>
     </div>
@@ -73,6 +87,47 @@
         })} />
       </div>
     </section>
+
+    {#if iv.length}
+      <section class="panel">
+        <h2>Intervalle</h2>
+        <p class="muted small">Belastungsintervalle aus dem Garmin-Workout. Die Intervalle liegen bei jedem Lauf an derselben Stelle der Strecke und sind deshalb direkt vergleichbar. Fortschritt heisst: gleiches Tempo bei tieferem Puls oder schneller bei gleichem Puls. Linien: Schnitt über 5 Läufe.</p>
+        <div class="grid2">
+          <Plot height={240} make={(w, P) => ({
+            marginLeft: 44, x: { type: 'utc', label: null }, y: { label: 'Ø Puls im Intervall', grid: true, zero: false },
+            color: { legend: true, scheme: 'tableau10' },
+            marks: [P.dot(iv, { x: 'date', y: 'avg_hr', fill: 'Intervall', r: 1.8, fillOpacity: 0.5 }), P.lineY(iv, P.windowY({ k: 5 }, { x: 'date', y: 'avg_hr', stroke: 'Intervall', z: 'Intervall', strokeWidth: 2 })),
+              P.tip(iv, P.pointer({ x: 'date', y: 'avg_hr', title: (d) => `${fmtDate(d.start_time)} · Intervall ${d.n}\nØ ${fmtNum(d.avg_hr)} / max ${fmtNum(d.max_hr)} bpm · Pace ${fmtPace(d.avg_speed)}` }))]
+          })} />
+          <Plot height={240} make={(w, P) => ({
+            marginLeft: 44, x: { type: 'utc', label: null }, y: { label: 'Pace (min/km)', grid: true, reverse: true, tickFormat: fmtMin, zero: false },
+            color: { legend: true, scheme: 'tableau10' },
+            marks: [P.dot(iv.filter((d) => d.pace && d.pace < 15), { x: 'date', y: 'pace', fill: 'Intervall', r: 1.8, fillOpacity: 0.5 }), P.lineY(iv.filter((d) => d.pace && d.pace < 15), P.windowY({ k: 5 }, { x: 'date', y: 'pace', stroke: 'Intervall', z: 'Intervall', strokeWidth: 2 }))]
+          })} />
+        </div>
+        <div class="tablewrap"><table>
+          <thead><tr><th>Intervall</th><th class="num">Pace erste 6 Läufe</th><th class="num">letzte 6 Läufe</th><th class="num">Ø Puls erste 6</th><th class="num">letzte 6</th><th class="num">Differenz Puls</th></tr></thead>
+          <tbody>
+            {#each ivTable as t}
+              <tr><td>Intervall {t.n}</td><td class="num">{fmtPace(t.sp0)}</td><td class="num">{fmtPace(t.sp1)}</td><td class="num">{fmtNum(t.hr0)}</td><td class="num">{fmtNum(t.hr1)}</td>
+                <td class="num {t.hr1 < t.hr0 ? 'delta-good' : t.hr1 > t.hr0 ? 'delta-bad' : ''}">{t.hr0 != null ? fmtDelta(t.hr1 - t.hr0, 0, ' bpm') : ''}</td></tr>
+            {/each}
+          </tbody>
+        </table></div>
+      </section>
+    {/if}
+
+    {#if zs.length}
+      <section class="panel">
+        <h2>Zeit im Zielpuls-Bereich</h2>
+        <p class="muted small">Anteil der Belastungszeit innerhalb der Pulsvorgabe des Garmin-Workouts (zuletzt {data.zones.at(-1).zone.low}–{data.zones.at(-1).zone.high} bpm).</p>
+        <Plot height={200} make={(w, P) => ({
+          marginLeft: 44, x: { type: 'utc', label: null, ticks: 6 }, y: { label: '% im Bereich', grid: true, domain: [0, 100] },
+          marks: [P.rectY(zs, { x: 'date', y: 'share', fill: 'var(--good)', interval: 'day', insetLeft: 0.5, insetRight: 0.5 }),
+            P.tip(zs, P.pointerX({ x: 'date', y: 'share', title: (d) => `${fmtDate(d.start_time)}\n${Math.round(d.share)} % im Bereich ${d.zone.low}–${d.zone.high}\n${fmtDur(d.zone.below)} darunter · ${fmtDur(d.zone.above)} darüber` }))]
+        })} />
+      </section>
+    {/if}
 
     <section class="panel">
       <h2>Abschnitte</h2>
